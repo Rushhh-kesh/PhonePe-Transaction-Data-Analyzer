@@ -7,6 +7,36 @@ from datetime import datetime
 import tempfile
 import os
 
+# Page configuration (must be first)
+st.set_page_config(page_title="Transaction Analyzer", layout="wide")
+
+# Predefined user credentials
+USER_CREDENTIALS = {
+    "FroTest": "FroTest123",
+    "ForRushi": "ForRushi",
+    "ForFriends": "ForFriends123"
+}
+
+def login():
+    """Login page for user authentication."""
+    st.title("🔒 Login Page")
+    username = st.text_input("Enter your Username")
+    password = st.text_input("Enter your Password", type="password")
+    login_button = st.button("Login")
+
+    if login_button:
+        if username in USER_CREDENTIALS and password == USER_CREDENTIALS[username]:
+            st.session_state['logged_in'] = True
+            st.session_state['username'] = username
+            st.success(f"Welcome, {username}!")
+        else:
+            st.error("Invalid username or password. Please try again.")
+
+def logout():
+    """Logout function."""
+    st.session_state['logged_in'] = False
+    st.session_state['username'] = ""
+
 class TransactionAnalyzer:
     def __init__(self, pdf_path: str, language: str = 'en'):
         self.transactions = self._parse_transactions(pdf_path)
@@ -15,10 +45,8 @@ class TransactionAnalyzer:
     def _parse_date(self, date_str: str) -> datetime:
         """Parse date string with error handling."""
         try:
-            # Clean and normalize the date string
             date_str = date_str.strip()
-            # Adjust date format as per your input data
-            return datetime.strptime(date_str, '%b %d, %Y')
+            return datetime.strptime(date_str, '%b %d, %Y')  # Adjust format as needed
         except ValueError as e:
             st.warning(f"Warning: Unable to parse date '{date_str}'.")
             return None
@@ -35,7 +63,6 @@ class TransactionAnalyzer:
                 
                 for line_number, line in enumerate(text.split('\n')):
                     try:
-                        # Basic validation for line format (Adjust according to your data)
                         date_str = line[:12].strip()  # Assuming date is the first 12 characters
                         amount_index = line.rfind('₹')
                         if amount_index == -1:
@@ -44,14 +71,12 @@ class TransactionAnalyzer:
                         amount_str = line[amount_index + 1:].strip().replace(',', '')  # Remove commas in amounts
                         description = line[12:amount_index].strip()
                         transaction_type = 'CREDIT' if 'CREDIT' in line.upper() else 'DEBIT'
-                        
-                        # Parse amount and date
+
                         amount = float(amount_str)
                         date = self._parse_date(date_str)
                         if date is None:
                             continue  # Skip if date parsing fails
 
-                        # Append valid transactions
                         transactions.append({
                             'date': date,
                             'description': description,
@@ -63,7 +88,6 @@ class TransactionAnalyzer:
                         st.error(e)
                         continue
 
-        # Return transactions sorted by date
         return sorted(transactions, key=lambda x: x['date'], reverse=True) if transactions else []
 
     def get_total_spending(self):
@@ -91,83 +115,43 @@ def create_charts(analyzer):
         'type': t['type'],
         'description': t['description']
     } for t in analyzer.transactions])
-    df['date'] = pd.to_datetime(df['date'], errors='coerce')  # Handle invalid dates gracefully
+    df['date'] = pd.to_datetime(df['date'], errors='coerce')
 
     # Daily spending chart
     daily_spending = df[df['type'] == 'DEBIT'].groupby('date')['amount'].sum().reset_index()
     fig_daily = px.line(daily_spending, x='date', y='amount',
                         title=translate("Daily Spending Trend", analyzer.language),
                         labels={'amount': translate("Amount", analyzer.language), 'date': translate("Date", analyzer.language)})
-    
+
     # Top merchants chart
-    merchant_data = pd.DataFrame(analyzer.get_merchant_analysis(), 
+    merchant_data = pd.DataFrame(analyzer.get_merchant_analysis(),
                                  columns=[translate('Merchant', analyzer.language), translate('Amount', analyzer.language)])
     fig_merchants = px.bar(merchant_data.head(10), x=translate('Merchant', analyzer.language), y=translate('Amount', analyzer.language),
                            title=translate("Top 10 Merchants by Spending", analyzer.language))
     fig_merchants.update_layout(xaxis_tickangle=-45)
-    
+
     fig_pie = px.pie(df, values='amount', names='type',
                      title=translate("Transaction Distribution", analyzer.language))
-    
+
     return fig_daily, fig_merchants, fig_pie
 
 def translate(text, language):
     translations = {
-        'Daily Spending Trend': {
-            'en': 'Daily Spending Trend',
-            'hi': 'दैनिक खर्च प्रवृत्ति',
-            'mr': 'दैनंदिन खर्च प्रवृत्ती'
-        },
-        'Amount': {
-            'en': 'Amount',
-            'hi': 'राशि',
-            'mr': 'रक्कम'
-        },
-        'Date': {
-            'en': 'Date',
-            'hi': 'तारीख',
-            'mr': 'तारीख'
-        },
-        'Merchant': {
-            'en': 'Merchant',
-            'hi': 'व्यापारी',
-            'mr': 'व्यापारी'
-        },
-        'Top 10 Merchants by Spending': {
-            'en': 'Top 10 Merchants by Spending',
-            'hi': 'खर्च के अनुसार शीर्ष 10 व्यापारी',
-            'mr': 'खर्चानुसार शीर्ष १० व्यापारी'
-        },
-        'Transaction Distribution': {
-            'en': 'Transaction Distribution',
-            'hi': 'लेनदेन वितरण',
-            'mr': 'व्यवहार वितरण'
-        },
-        'Total Spending': {
-            'en': 'Total Spending',
-            'hi': 'कुल खर्च',
-            'mr': 'एकूण खर्च'
-        },
-        'Total Income': {
-            'en': 'Total Income',
-            'hi': 'कुल आय',
-            'mr': 'एकूण उत्पन्न'
-        },
-        'Net Balance': {
-            'en': 'Net Balance',
-            'hi': 'कुल शेष',
-            'mr': 'निव्वळ शिल्लक'
-        },
-        'Analysis Period': {
-            'en': 'Analysis Period',
-            'hi': 'विश्लेषण अवधि',
-            'mr': 'विश्लेषण कालावधी'
-        }
+        'Daily Spending Trend': {'en': 'Daily Spending Trend', 'hi': 'दैनिक खर्च प्रवृत्ति', 'mr': 'दैनंदिन खर्च प्रवृत्ती'},
+        'Amount': {'en': 'Amount', 'hi': 'राशि', 'mr': 'रक्कम'},
+        'Date': {'en': 'Date', 'hi': 'तारीख', 'mr': 'तारीख'},
+        'Merchant': {'en': 'Merchant', 'hi': 'व्यापारी', 'mr': 'व्यापारी'},
+        'Top 10 Merchants by Spending': {'en': 'Top 10 Merchants by Spending', 'hi': 'खर्च के अनुसार शीर्ष 10 व्यापारी', 'mr': 'खर्चानुसार शीर्ष १० व्यापारी'},
+        'Transaction Distribution': {'en': 'Transaction Distribution', 'hi': 'लेनदेन वितरण', 'mr': 'व्यवहार वितरण'},
+        'Total Spending': {'en': 'Total Spending', 'hi': 'कुल खर्च', 'mr': 'एकूण खर्च'},
+        'Total Income': {'en': 'Total Income', 'hi': 'कुल आय', 'mr': 'एकूण उत्पन्न'},
+        'Net Balance': {'en': 'Net Balance', 'hi': 'कुल शेष', 'mr': 'निव्वळ शिल्लक'},
+        'Analysis Period': {'en': 'Analysis Period', 'hi': 'विश्लेषण अवधि', 'mr': 'विश्लेषण कालावधी'}
     }
     return translations.get(text, {}).get(language, text)
 
-def main():
-    st.set_page_config(page_title="Transaction Analyzer", layout="wide")
+def main_app():
+    """Main application after user is logged in."""
     st.title("📊 Transaction Analyzer")
     st.write("Upload your PDF statement to analyze transactions")
 
@@ -241,6 +225,22 @@ def main():
                     st.plotly_chart(fig_pie, use_container_width=True)
 
         os.unlink(pdf_path)
+
+def main():
+    """Main function to control the app flow with login."""
+    if 'logged_in' not in st.session_state:
+        st.session_state['logged_in'] = False
+        st.session_state['username'] = ""
+
+    if not st.session_state['logged_in']:
+        login()
+    else:
+        st.sidebar.title("Menu")
+        st.sidebar.write(f"Logged in as: {st.session_state['username']}")
+        if st.sidebar.button("Logout"):
+            logout()
+        else:
+            main_app()
 
 if __name__ == "__main__":
     main()
